@@ -16,11 +16,11 @@ let streamRef = null;
 
 async function initWorker() {
   if (!worker) {
-    statusMsg.innerText = "Optimizando enfoque...";
+    statusMsg.innerText = "Sincronizando visor...";
     worker = await Tesseract.createWorker('eng');
     await worker.setParameters({
-      tessedit_char_whitelist: '0123456789AB ', // Permitir espacio para series como '221 A'
-      tessedit_pageseg_mode: '7' 
+      tessedit_char_whitelist: '0123456789AB',
+      tessedit_pageseg_mode: '7'
     });
   }
 }
@@ -36,7 +36,7 @@ document.getElementById("scanBtn").onclick = async () => {
     document.getElementById("scanner-container").hidden = false;
     scanning = true;
     procesarFrame();
-  } catch (e) { alert("Error de cámara."); }
+  } catch (e) { alert("Error de cámara. Use HTTPS."); }
 };
 
 async function procesarFrame() {
@@ -45,40 +45,38 @@ async function procesarFrame() {
   const vH = video.videoHeight;
   if (vW === 0) { requestAnimationFrame(procesarFrame); return; }
 
-  // CALIBRACIÓN DEL MARGEN:
-  // El guide-box en CSS tiene height: 90px y width: 85%.
-  // Para que coincida, el recorte debe ser proporcional al centro del video.
-  const scanWidth = vW * 0.85;
-  const scanHeight = vH * 0.25; // Aumentamos margen de lectura vertical
-  const startX = (vW - scanWidth) / 2;
-  const startY = (vH - scanHeight) / 2;
+  // CALIBRACIÓN DE CENTRADO DINÁMICO
+  // Calculamos el área de lectura basándonos en el centro absoluto del video
+  const cropW = vW * 0.8;  // 80% del ancho del video
+  const cropH = vH * 0.15; // 15% del alto del video (franja estrecha para la serie)
+  const startX = (vW - cropW) / 2;
+  const startY = (vH - cropH) / 2;
 
-  canvas.width = 1000; // Resolución fija para la IA
-  canvas.height = 300;
+  canvas.width = 1000;
+  canvas.height = 200;
 
-  // Dibujamos exactamente lo que el usuario ve en el cuadro
-  ctx.drawImage(video, startX, startY, scanWidth, scanHeight, 0, 0, 1000, 300);
+  // Dibujar el recorte centrado en el canvas
+  ctx.drawImage(video, startX, startY, cropW, cropH, 0, 0, 1000, 200);
 
-  // Filtro de nitidez (Binarización mejorada)
-  let imgData = ctx.getImageData(0, 0, 1000, 300);
+  // Pre-procesamiento para mejorar contraste
+  let imgData = ctx.getImageData(0, 0, 1000, 200);
   let d = imgData.data;
   for (let i = 0; i < d.length; i += 4) {
     let brightness = (d[i] + d[i+1] + d[i+2]) / 3;
-    let v = brightness < 115 ? 0 : 255; 
+    let v = brightness < 125 ? 0 : 255;
     d[i] = d[i+1] = d[i+2] = v;
   }
   ctx.putImageData(imgData, 0, 0);
 
   try {
     const { data: { text } } = await worker.recognize(canvas);
-    // Limpiamos texto manteniendo el patrón de la serie
     const limpio = text.toUpperCase().replace(/[^0-9AB]/g, "");
     const match = limpio.match(/(\d{8,9})([AB])/);
 
     if (match) {
       verificar(match[1] + match[2], parseInt(match[1]), match[2]);
     } else {
-      setTimeout(procesarFrame, 200); // Escaneo más rápido
+      setTimeout(procesarFrame, 250);
     }
   } catch (err) {
     setTimeout(procesarFrame, 500);
@@ -94,11 +92,11 @@ function verificar(serieFull, numero, letra) {
 
   document.getElementById("modal-title").innerText = esIlegal ? "⚠️ SERIE NO VÁLIDA" : "✅ SERIE VÁLIDA";
   document.getElementById("modal-title").style.color = esIlegal ? "#ff4444" : "#00ff88";
-  document.getElementById("modal-text").innerHTML = `Detectado: <strong>${serieFull}</strong><br>Billete: Bs. ${denom}`;
+  document.getElementById("modal-text").innerHTML = `Serie: <strong>${serieFull}</strong><br>Billete: Bs. ${denom}`;
   document.getElementById("custom-modal").hidden = false;
 }
 
-// BOTONES DE CIERRE (Reseteo de página solicitado)
+// Reseteo total al cerrar
 const reset = () => location.reload();
 document.getElementById("modal-close").onclick = reset;
 document.getElementById("closeBtn").onclick = reset;
