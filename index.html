@@ -21,16 +21,15 @@
         <option value="20" selected>Bs. 20</option>
         <option value="50">Bs. 50</option>
       </select>
-      
       <button id="scanBtn">Iniciar Escáner 📷</button>
-
-      <a href="https://drive.google.com/file/d/1Zr53HBWlIemNAF6XzGrknkQNBJzJlw1R/view?usp=sharing" 
-         target="_blank" 
-         class="donate-link" 
-         id="donateBtn">
-        Apoyar con una Donación 🎁
-      </a>
     </div>
+
+    <a href="https://drive.google.com/file/d/1Zr53HBWlIemNAF6XzGrknkQNBJzJlw1R/view?usp=sharing" 
+       target="_blank" 
+       class="donate-link" 
+       id="donateBtn">
+      Apoyar con una Donación 🎁
+    </a>
   </div>
 
   <div id="scanner-container" hidden>
@@ -51,6 +50,13 @@
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="script.js"></script>
   
+  <script>
+    // Mensaje de bienvenida al cargar
+    window.onload = function() {
+      alert("Bienvenido al Detector de Series. Asegúrese de tener buena iluminación para el escaneo.");
+    };
+  </script>
+
   <div id="custom-modal" hidden>
     <div class="modal-content">
       <h2 id="modal-title">Resultado</h2>
