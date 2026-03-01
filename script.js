@@ -52,7 +52,7 @@ document.getElementById("scanBtn").onclick = async () => {
     document.getElementById("scanner-container").hidden = false;
     scanning = true;
     procesarFrame();
-  } catch (e) { alert("Error de cámara. Use HTTPS."); }
+  } catch (e) { alert("Error de cámara. Use HTTPS y autorice el permiso."); }
 };
 
 async function procesarFrame() {
@@ -73,20 +73,27 @@ async function procesarFrame() {
   }
   ctx.putImageData(imgData, 0, 0);
 
-  const { data: { text } } = await worker.recognize(canvas);
-  const limpio = text.toUpperCase().replace(/[^0-9AB]/g, "");
-  const match = limpio.match(/(\d{8,9})([AB])/);
+  try {
+    const { data: { text } } = await worker.recognize(canvas);
+    const limpio = text.toUpperCase().replace(/[^0-9AB]/g, "");
+    const match = limpio.match(/(\d{8,9})([AB])/);
 
-  if (match) {
-    verificar(match[1] + match[2], parseInt(match[1]), match[2]);
-  } else {
-    setTimeout(procesarFrame, 400);
+    if (match) {
+      verificar(match[1] + match[2], parseInt(match[1]), match[2]);
+    } else {
+      setTimeout(procesarFrame, 400);
+    }
+  } catch (err) {
+    console.error(err);
+    setTimeout(procesarFrame, 500);
   }
 }
 
 function verificar(serieFull, numero, letra) {
   scanning = false;
   const denom = document.getElementById("denominacion").value;
+  
+  // Detener cámara al encontrar resultado
   if (streamRef) streamRef.getTracks().forEach(t => t.stop());
 
   let esIlegal = false;
@@ -101,5 +108,15 @@ function verificar(serieFull, numero, letra) {
   modal.hidden = false;
 }
 
-document.getElementById("modal-close").onclick = () => location.reload();
-document.getElementById("closeBtn").onclick = () => location.reload();
+// Función para cerrar todo y volver al inicio sin recargar
+function reiniciarApp() {
+  scanning = false;
+  if (streamRef) streamRef.getTracks().forEach(t => t.stop());
+  document.getElementById("custom-modal").hidden = true;
+  document.getElementById("scanner-container").hidden = true;
+  document.getElementById("main-ui").hidden = false;
+}
+
+// Eventos de cierre corregidos
+document.getElementById("modal-close").onclick = reiniciarApp;
+document.getElementById("closeBtn").onclick = reiniciarApp;
