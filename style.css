@@ -72,14 +72,13 @@ video { width: 100%; height: 100%; object-fit: cover; }
   position: absolute;
   inset: 0;
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  align-items: center; /* Centrado vertical absoluto */
+  justify-content: center; /* Centrado horizontal absoluto */
 }
 
 #guide-box {
   width: 85%;
-  height: 100px;
-  margin-top: 25vh;
+  height: 120px; /* Un poco más alto para facilitar el enfoque */
   position: relative;
   box-shadow: 0 0 0 5000px rgba(0, 0, 0, 0.75);
   border: 2px solid var(--neon);
@@ -153,4 +152,5 @@ video { width: 100%; height: 100%; object-fit: cover; }
 }
 
 [hidden] { display: none !important; }
+
 
