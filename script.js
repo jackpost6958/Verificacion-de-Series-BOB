@@ -12,15 +12,18 @@ const baseDatosIlegal = {
 let scanning = false;
 let worker = null;
 let streamRef = null;
+let isProcessing = false; // Nueva bandera para evitar saturación
 
+// Inicialización única del Worker
 async function initWorker() {
   if (!worker) {
-    statusMsg.innerText = "Optimizando IA...";
+    statusMsg.innerText = "Cargando IA...";
     worker = await Tesseract.createWorker('eng');
     await worker.setParameters({
       tessedit_char_whitelist: '0123456789AB',
-      tessedit_pageseg_mode: '7',
+      tessedit_pageseg_mode: '7', // Tratar como una sola línea
     });
+    statusMsg.innerText = "IA Lista";
   }
 }
 
@@ -28,37 +31,39 @@ document.getElementById("scanBtn").onclick = async () => {
   try {
     await initWorker();
     streamRef = await navigator.mediaDevices.getUserMedia({ 
-      video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } 
+      video: { facingMode: "environment", width: { ideal: 1280 } } 
     });
     video.srcObject = streamRef;
     document.getElementById("main-ui").hidden = true;
     document.getElementById("scanner-container").hidden = false;
     scanning = true;
     procesarFrame();
-  } catch (e) { alert("Error: Use HTTPS y autorice la cámara."); }
+  } catch (e) { alert("Error al acceder a la cámara."); }
 };
 
 async function procesarFrame() {
-  if (!scanning) return;
+  if (!scanning || isProcessing) return;
+  
   const vW = video.videoWidth;
   const vH = video.videoHeight;
   if (vW === 0) { requestAnimationFrame(procesarFrame); return; }
 
-  canvas.width = 1200; 
-  canvas.height = 250;
+  isProcessing = true; // Bloqueamos nuevas capturas hasta terminar esta
+  statusMsg.innerText = "Escaneando...";
 
-  const cropX = vW * 0.075;
-  const cropY = vH * 0.22;
-  const cropW = vW * 0.85;
-  const cropH = vH * 0.15;
+  // Canvas de alta resolución para Tesseract
+  canvas.width = 1000;
+  canvas.height = 200;
 
-  ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, 1200, 250);
+  // Ajuste de área: capturamos el 80% ancho y 20% alto donde está el cuadro guía
+  ctx.drawImage(video, vW * 0.1, vH * 0.25, vW * 0.8, vH * 0.2, 0, 0, 1000, 200);
 
-  let imgData = ctx.getImageData(0, 0, 1200, 250);
+  // Pre-procesamiento: Mejora drástica de contraste
+  let imgData = ctx.getImageData(0, 0, 1000, 200);
   let d = imgData.data;
   for (let i = 0; i < d.length; i += 4) {
-    let gray = (d[i] + d[i+1] + d[i+2]) / 3;
-    let v = gray < 110 ? 0 : 255; 
+    let brightness = (d[i] + d[i+1] + d[i+2]) / 3;
+    let v = brightness < 120 ? 0 : 255; // Blanco y negro puro
     d[i] = d[i+1] = d[i+2] = v;
   }
   ctx.putImageData(imgData, 0, 0);
@@ -66,36 +71,53 @@ async function procesarFrame() {
   try {
     const { data: { text } } = await worker.recognize(canvas);
     const limpio = text.toUpperCase().replace(/[^0-9AB]/g, "");
-    
     const match = limpio.match(/(\d{8,9})([AB])/);
 
     if (match) {
       verificar(match[1] + match[2], parseInt(match[1]), match[2]);
     } else {
-      statusMsg.innerText = "Enfoque la serie numérica...";
-      setTimeout(procesarFrame, 300);
+      isProcessing = false;
+      setTimeout(procesarFrame, 200); // Pequeña pausa para no calentar el procesador
     }
   } catch (err) {
+    isProcessing = false;
     setTimeout(procesarFrame, 500);
   }
 }
 
 function verificar(serieFull, numero, letra) {
   scanning = false;
-  if (streamRef) streamRef.getTracks().forEach(t => t.stop());
+  isProcessing = false;
+  detenerCamara();
 
   const denom = document.getElementById("denominacion").value;
-  let esIlegal = false;
-  if (letra === "B" && baseDatosIlegal[denom]) {
-    esIlegal = baseDatosIlegal[denom].some(([min, max]) => numero >= min && numero <= max);
-  }
+  let esIlegal = letra === "B" && baseDatosIlegal[denom]?.some(([min, max]) => numero >= min && numero <= max);
 
   const modal = document.getElementById("custom-modal");
   document.getElementById("modal-title").innerText = esIlegal ? "⚠️ SERIE NO VÁLIDA" : "✅ SERIE VÁLIDA";
   document.getElementById("modal-title").style.color = esIlegal ? "#ff4444" : "#00ff88";
-  document.getElementById("modal-text").innerHTML = `Detectado: <strong>${serieFull}</strong><br>Billete: Bs. ${denom}`;
+  document.getElementById("modal-text").innerHTML = `Serie: <strong>${serieFull}</strong><br>Billete: Bs. ${denom}`;
   modal.hidden = false;
 }
 
-document.getElementById("modal-close").onclick = () => location.reload();
-document.getElementById("closeBtn").onclick = () => location.reload();
+// Función robusta para apagar cámara y resetear UI
+function reiniciarTodo() {
+  scanning = false;
+  isProcessing = false;
+  detenerCamara();
+  document.getElementById("custom-modal").hidden = true;
+  document.getElementById("scanner-container").hidden = true;
+  document.getElementById("main-ui").hidden = false;
+}
+
+function detenerCamara() {
+  if (streamRef) {
+    streamRef.getTracks().forEach(track => track.stop());
+    streamRef = null;
+  }
+  video.srcObject = null;
+}
+
+// ASIGNACIÓN DE BOTONES (Corregido)
+document.getElementById("modal-close").onclick = reiniciarTodo;
+document.getElementById("closeBtn").onclick = reiniciarTodo;
