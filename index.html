@@ -2,20 +2,68 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Validador de Series</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Detector de Series BOB</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <button id="scanBtn">📷 Escanear con la cámara</button>
+  <div id="main-ui">
+    <header>
+      <h1>Detector de Serie Ilegal</h1>
+      <p class="disclaimer">Verifique siempre el resultado visualmente. Esta herramienta es una ayuda técnica no oficial.</p>
+    </header>
 
-  <video id="video" autoplay playsinline hidden></video>
+    <div class="setup-card">
+      <label for="denominacion">Denominación del Billete:</label>
+      <select id="denominacion">
+        <option value="10">Bs. 10</option>
+        <option value="20" selected>Bs. 20</option>
+        <option value="50">Bs. 50</option>
+      </select>
+      <button id="scanBtn">Iniciar Escáner 📷</button>
+    </div>
+
+    <a href="https://drive.google.com/file/d/1Zr53HBWlIemNAF6XzGrknkQNBJzJlw1R/view?usp=sharing" 
+       target="_blank" 
+       class="donate-link" 
+       id="donateBtn">
+      Apoyar con una Donación 🎁
+    </a>
+  </div>
+
+  <div id="scanner-container" hidden>
+    <video id="video" autoplay playsinline muted></video>
+    <div id="overlay">
+      <div id="guide-box">
+        <div class="corner tl"></div><div class="corner tr"></div>
+        <div class="corner bl"></div><div class="corner br"></div>
+        <div class="scan-line"></div>
+      </div>
+      <p id="status-msg">Cargando motor de IA...</p>
+    </div>
+    <button id="closeBtn">✖</button>
+  </div>
+
   <canvas id="canvas" hidden></canvas>
 
-  <!-- OCR GRATIS -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="script.js"></script>
+  
+  <script>
+    // Mensaje de bienvenida al cargar
+    window.onload = function() {
+      alert("Bienvenido al Detector de Series. Asegúrese de tener buena iluminación para el escaneo.");
+    };
+  </script>
 
+  <div id="custom-modal" hidden>
+    <div class="modal-content">
+      <h2 id="modal-title">Resultado</h2>
+      <p id="modal-text"></p>
+      <p class="modal-instruction">Compare el número detectado con el billete real.</p>
+      <button id="modal-close">Cerrar</button>
+    </div>
+  </div>
 </body>
 </html>
