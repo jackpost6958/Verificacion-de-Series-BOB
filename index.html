@@ -4,19 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Detector de Series BOB</title>
-  
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#00ff88">
-  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2489/2489756.png">
-  
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
   <div id="main-ui">
     <header>
-      <h1>Detector de Billetes</h1>
-      <p class="disclaimer">Esta aplicación está en desarrollo y no es oficial, puede cometer errores. Use plataformas oficiales para dudas.</p>
+      <h1>Detector de Serie Ilegal</h1>
+      <p class="disclaimer">Verifique siempre el resultado visualmente. Esta herramienta es una ayuda técnica no oficial.</p>
     </header>
 
     <div class="setup-card">
@@ -26,7 +21,15 @@
         <option value="20" selected>Bs. 20</option>
         <option value="50">Bs. 50</option>
       </select>
+      
       <button id="scanBtn">Iniciar Escáner 📷</button>
+
+      <a href="https://drive.google.com/file/d/1Zr53HBWlIemNAF6XzGrknkQNBJzJlw1R/view?usp=sharing" 
+         target="_blank" 
+         class="donate-link" 
+         id="donateBtn">
+        Apoyar con una Donación 🎁
+      </a>
     </div>
   </div>
 
@@ -38,7 +41,7 @@
         <div class="corner bl"></div><div class="corner br"></div>
         <div class="scan-line"></div>
       </div>
-      <p id="status-msg">Enfoque la serie numérica</p>
+      <p id="status-msg">Cargando motor de IA...</p>
     </div>
     <button id="closeBtn">✖</button>
   </div>
@@ -47,12 +50,14 @@
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="script.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./service-worker.js')
-        .then(() => console.log("PWA: Service Worker Activo"))
-        .catch(err => console.log("PWA: Error", err));
-    }
-  </script>
+  
+  <div id="custom-modal" hidden>
+    <div class="modal-content">
+      <h2 id="modal-title">Resultado</h2>
+      <p id="modal-text"></p>
+      <p class="modal-instruction">Compare el número detectado con el billete real.</p>
+      <button id="modal-close">Cerrar</button>
+    </div>
+  </div>
 </body>
 </html>
