@@ -1,137 +1,105 @@
-const scanBtn = document.getElementById("scanBtn");
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
+const statusMsg = document.getElementById("status-msg");
 
-/* =========================
-   RANGOS DE SERIES ERRÓNEAS
-   ========================= */
+const baseDatosIlegal = {
+  10: [
+    [67250001, 67700000], [69050001, 69500000], [69500001, 69950000],
+    [69995001, 70400000], [70400001, 70850000], [70850001, 71300000],
+    [76310012, 85139995], [86400001, 86850000], [90900001, 91350000],
+    [91800001, 92250000]
+  ],
+  20: [
+    [87280145, 91646549], [96650001, 97100000], [99800001, 100250000],
+    [100250001, 100700000], [109250001, 109700000], [110600001, 111050000],
+    [111050001, 111500000], [111950001, 112400000], [112400001, 112850000],
+    [112850001, 113300000], [114200001, 114650000], [114650001, 115100000],
+    [115100001, 115550000], [118700001, 119150000], [119150001, 119600000],
+    [120500001, 120950000]
+  ],
+  50: [
+    [77100001, 77550000], [78000001, 78450000], [78900001, 96350000],
+    [96350001, 96800000], [96800001, 97250000], [98150001, 98600000],
+    [104900001, 105350000], [105350001, 105800000], [106700001, 107150000],
+    [107600001, 108050000], [108050001, 108500000], [109400001, 109850000]
+  ]
+};
 
-const rangos10 = [
-  [67250001, 67700000],
-  [69050001, 69500000],
-  [69500001, 69950000],
-  [69950001, 70400000],
-  [70400001, 70850000],
-  [70850001, 71300000],
-  [76310012, 85139995],
-  [86400001, 86850000],
-  [90900001, 91350000],
-  [91800001, 92250000]
-];
+let scanning = false;
+let worker = null;
+let streamRef = null;
 
-const rangos20 = [
-  [87280145, 91646549],
-  [96650001, 97100000],
-  [99800001, 100250000],
-  [100250001, 100700000],
-  [109250001, 109700000],
-  [110600001, 111050000],
-  [111050001, 111500000],
-  [111950001, 112400000],
-  [112400001, 112850000],
-  [112850001, 113300000],
-  [114200001, 114650000],
-  [114650001, 115100000],
-  [115100001, 115550000],
-  [118700001, 119150000],
-  [119150001, 119600000],
-  [120500001, 120950000]
-];
-
-const rangos50 = [
-  [77100001, 77550000],
-  [78000001, 78450000],
-  [78900001, 96350000],
-  [96350001, 96800000],
-  [96800001, 97250000],
-  [98150001, 98600000],
-  [104900001, 105350000],
-  [105350001, 105800000],
-  [106700001, 107150000],
-  [107600001, 108050000],
-  [108050001, 108500000],
-  [109400001, 109850000]
-];
-
-/* ========================= */
-
-scanBtn.addEventListener("click", iniciarCamara);
-
-async function iniciarCamara() {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "environment" }
-  });
-
-  video.srcObject = stream;
-  video.hidden = false;
-
-  setTimeout(() => capturarImagen(stream), 2000);
+async function initWorker() {
+  if (!worker) {
+    statusMsg.innerText = "Iniciando motor...";
+    worker = await Tesseract.createWorker('eng');
+    await worker.setParameters({
+      tessedit_char_whitelist: '0123456789AB',
+      tessedit_pageseg_mode: '7'
+    });
+  }
 }
 
-function capturarImagen(stream) {
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.drawImage(video, 0, 0);
+document.getElementById("scanBtn").onclick = async () => {
+  try {
+    await initWorker();
+    streamRef = await navigator.mediaDevices.getUserMedia({ 
+      video: { facingMode: "environment", width: { ideal: 1280 } } 
+    });
+    video.srcObject = streamRef;
+    document.getElementById("main-ui").hidden = true;
+    document.getElementById("scanner-container").hidden = false;
+    scanning = true;
+    procesarFrame();
+  } catch (e) { alert("Error de cámara. Use HTTPS."); }
+};
 
-  stream.getTracks().forEach(track => track.stop());
-  video.hidden = true;
+async function procesarFrame() {
+  if (!scanning) return;
+  const vW = video.videoWidth;
+  const vH = video.videoHeight;
+  if (vW === 0) { requestAnimationFrame(procesarFrame); return; }
 
-  reconocerTexto();
+  canvas.width = 800; canvas.height = 160;
+  ctx.drawImage(video, vW * 0.1, vH * 0.4, vW * 0.8, vH * 0.2, 0, 0, 800, 160);
+
+  let imgData = ctx.getImageData(0, 0, 800, 160);
+  let d = imgData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    let gray = (d[i] + d[i+1] + d[i+2]) / 3;
+    let v = gray < 120 ? 0 : 255;
+    d[i] = d[i+1] = d[i+2] = v;
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  const { data: { text } } = await worker.recognize(canvas);
+  const limpio = text.toUpperCase().replace(/[^0-9AB]/g, "");
+  const match = limpio.match(/(\d{8,9})([AB])/);
+
+  if (match) {
+    verificar(match[1] + match[2], parseInt(match[1]), match[2]);
+  } else {
+    setTimeout(procesarFrame, 400);
+  }
 }
 
-async function reconocerTexto() {
-  const { data: { text } } = await Tesseract.recognize(
-    canvas,
-    "eng",
-    { logger: () => {} }
-  );
+function verificar(serieFull, numero, letra) {
+  scanning = false;
+  const denom = document.getElementById("denominacion").value;
+  if (streamRef) streamRef.getTracks().forEach(t => t.stop());
 
-  const limpio = text.replace(/\s/g, "").toUpperCase();
-  const regex = /\d{8,9}B|\d{8,9}[A-Z]/;
-  const match = limpio.match(regex);
-
-  if (!match) {
-    alert("❌ No se detectó un número de serie válido");
-    return;
+  let esIlegal = false;
+  if (letra === "B" && baseDatosIlegal[denom]) {
+    esIlegal = baseDatosIlegal[denom].some(([min, max]) => numero >= min && numero <= max);
   }
 
-  const serie = match[0];
-  preguntarBillete(serie);
+  const modal = document.getElementById("custom-modal");
+  document.getElementById("modal-title").innerText = esIlegal ? "⚠️ SERIE NO VÁLIDA" : "✅ SERIE VÁLIDA";
+  document.getElementById("modal-title").style.color = esIlegal ? "#ff4444" : "#00ff88";
+  document.getElementById("modal-text").innerHTML = `Serie: <strong>${serieFull}</strong><br>Billete: Bs. ${denom}`;
+  modal.hidden = false;
 }
 
-function preguntarBillete(serie) {
-  const opcion = prompt(
-    `Serie detectada: ${serie}\n\n¿De qué billete es?\nEscribe: 10, 20 o 50`
-  );
-
-  if (!opcion) return;
-
-  const billete = parseInt(opcion);
-
-  if (![10, 20, 50].includes(billete)) {
-    alert("❌ Opción inválida");
-    return;
-  }
-
-  const resultado = validarSerie(serie, billete);
-  alert(resultado ? "✅ Serie verdadera" : "❌ Serie errónea");
-}
-
-function estaEnRango(numero, rangos) {
-  return rangos.some(([min, max]) => numero >= min && numero <= max);
-}
-
-function validarSerie(serie, billete) {
-  // Si NO termina en B, es válida automáticamente
-  if (!serie.endsWith("B")) return true;
-
-  const numero = parseInt(serie.slice(0, -1));
-  if (isNaN(numero)) return false;
-
-  if (billete === 10) return !estaEnRango(numero, rangos10);
-  if (billete === 20) return !estaEnRango(numero, rangos20);
-  if (billete === 50) return !estaEnRango(numero, rangos50);
-
-  return false;
-}
+document.getElementById("modal-close").onclick = () => location.reload();
+document.getElementById("closeBtn").onclick = () => location.reload();
